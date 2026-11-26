@@ -1,0 +1,31 @@
+name: Deploy to EC2 via CodeDeploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+      - name: Bundle and upload revision
+        run: |
+          zip -r deploy-${{ github.run_number }}.zip appspec.yml index.html scripts
+          aws s3 cp deploy-${{ github.run_number }}.zip s3://ci-artifacts-jessica-2026/codedeploy/
+      - name: Create deployment
+        run: |
+          ID=$(aws deploy create-deployment \
+            --application-name demo-app \
+            --deployment-group-name demo-dg \
+            --s3-location bucket=ci-artifacts-jessica-2026,key=codedeploy/deploy-${{ github.run_number }}.zip,bundleType=zip \
+            --query deploymentId --output text)
+          echo "Deployment: $ID"
+          aws deploy wait deployment-successful --deployment-id $ID
