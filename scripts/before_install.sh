@@ -1,0 +1,3 @@
+#!/bin/bash
+yum install -y httpd
+mkdir -p /var/www/html
